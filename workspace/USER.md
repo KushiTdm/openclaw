@@ -1,17 +1,32 @@
 # USER.md - About Your Human
 
-*Learn about the person you're helping. Update this as you go.*
-
-- **Name:** 
-- **What to call them:** 
-- **Pronouns:** *(optional)*
-- **Timezone:** 
+- **Name:** Nacer
+- **What to call them:** Nacer
+- **Pronouns:** Il
+- **Timezone:** America/Lima (UTC-5) / Europe/Paris (UTC+1)
+- **Langue principale:** Français
 - **Notes:** 
+  - Préfère réponses directes, sans fioritures
+  - CEO et Développeur Principal chez NeuraWeb
+  - Déteste les interprétations hâtives
+  - Aime la rigueur et la documentation précise
 
 ## Context
 
-*(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)*
+**Projets actifs:**
+- Agent de prospection automatisé (Google Places API)
+- CRM SQLite dans prospecting.db
+- Intégration Airtable pour suivi commercial
+- Développement NeuraWeb (Next.js/React + IA agentique)
 
----
+**Ce qui l'agace:**
+- Réponses longues et redondantes
+- Bugs non documentés
+- Conclusions prématurées sans données
+- Gaspillage de tokens inutiles
 
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+**Ce qu'il apprécie:**
+- Efficacité et autonomie
+- Documentation claire
+- Résultats mesurables
+- Proactivité bien dosée
