@@ -1,0 +1,41 @@
+# === CREDENTIALS - NEVER COMMIT ===
+credentials/
+*.key
+*.pem
+.env
+
+# === CONFIG SENSIBLE ===
+openclaw.json
+update-check.json
+
+# === DATABASES ===
+*.db
+*.db-journal
+*.sqlite*
+
+# === LOGS & MEMORY ===
+logs/
+memory/
+
+# === CACHE ===
+canvas/
+cron/
+devices/
+
+# === PYTHON ===
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# === NODE ===
+node_modules/
+
+# === SYSTÈME ===
+.DS_Store
+*.swp
+*~
+
+# === BACKUPS ===
+*.backup
+*.bak
