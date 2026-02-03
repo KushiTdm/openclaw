@@ -50,26 +50,7 @@ class DatabaseManager:
     def insert_prospect(self, prospect_data):
         """
         Insère un nouveau prospect (avec vérification doublon)
-        
-        Args:
-            prospect_data (dict): {
-                'phone_number': '+51XXXXXXXXX',
-                'name': 'Hotel Sol',
-                'business_name': 'Hotel Sol',
-                'city': 'Cusco',
-                'country': 'Peru',
-                'type': 'hotel',
-                'source': 'google_places',
-                'google_maps_url': 'https://...',
-                'address': 'Av. Sol 123',
-                'rating': 4.2,
-                'review_count': 87
-            }
-        
-        Returns:
-            bool: True si insertion OK, False si doublon
         """
-        # Vérifier doublon AVANT insertion
         if self.check_duplicate(prospect_data['phone_number']):
             print(f"⚠️  Doublon: {prospect_data['phone_number']} ({prospect_data.get('name')})")
             return False
@@ -116,11 +97,6 @@ class DatabaseManager:
     def update_status(self, phone_number, new_status, notes=None):
         """
         Met à jour le statut d'un prospect
-        
-        Args:
-            phone_number (str): Numéro du prospect
-            new_status (str): new, to_contact, contacted, interested, not_interested, closed
-            notes (str): Notes optionnelles
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -152,9 +128,6 @@ class DatabaseManager:
     def get_prospects_to_contact(self, limit=10):
         """
         Récupère les prospects avec status='to_contact'
-        
-        Returns:
-            list: Liste de tuples (phone_number, name, city, business_name)
         """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -175,9 +148,6 @@ class DatabaseManager:
     def get_stats(self, date=None):
         """
         Récupère les stats pour une date donnée (ou aujourd'hui)
-        
-        Returns:
-            dict: Stats du jour
         """
         if not date:
             date = datetime.now().strftime('%Y-%m-%d')
@@ -185,18 +155,15 @@ class DatabaseManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Total prospects par statut
         cursor.execute("SELECT status, COUNT(*) FROM prospects GROUP BY status")
         status_counts = dict(cursor.fetchall())
         
-        # Prospects créés aujourd'hui
         cursor.execute("""
             SELECT COUNT(*) FROM prospects 
             WHERE DATE(created_at) = ?
         """, (date,))
         today_created = cursor.fetchone()[0]
         
-        # Prospects contactés aujourd'hui
         cursor.execute("""
             SELECT COUNT(*) FROM prospects 
             WHERE DATE(contacted_at) = ?
@@ -226,8 +193,131 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
+    # ============================
+    # NOUVELLES MÉTHODES AJOUTÉES
+    # ============================
+
+    def update_method_stats(self, method_name, action):
+        """
+        Met à jour les stats d'une méthode
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            if action == 'sent':
+                cursor.execute("""
+                    UPDATE method_stats 
+                    SET total_sent = total_sent + 1,
+                        last_updated = ?
+                    WHERE method_name = ?
+                """, (datetime.now().isoformat(), method_name))
+            
+            elif action == 'responded':
+                cursor.execute("""
+                    UPDATE method_stats 
+                    SET responded = responded + 1,
+                        conversion_rate = (responded * 1.0 / total_sent),
+                        last_updated = ?
+                    WHERE method_name = ?
+                """, (datetime.now().isoformat(), method_name))
+            
+            elif action == 'interested':
+                cursor.execute("""
+                    UPDATE method_stats 
+                    SET interested = interested + 1,
+                        conversion_rate = (interested * 1.0 / total_sent),
+                        last_updated = ?
+                    WHERE method_name = ?
+                """, (datetime.now().isoformat(), method_name))
+            
+            conn.commit()
+            print(f"✅ Stats méthode {method_name} mises à jour: {action}")
+            
+        except Exception as e:
+            print(f"❌ Erreur update stats: {e}")
+            self.log_error('update_method_stats', str(e), f"method: {method_name}, action: {action}")
+        
+        finally:
+            conn.close()
+
+    def get_best_method(self):
+        """Retourne la méthode avec le meilleur taux de conversion"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT method_name, conversion_rate 
+            FROM method_stats 
+            WHERE total_sent > 0
+            ORDER BY conversion_rate DESC 
+            LIMIT 1
+        """)
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            return {'method': result[0], 'conversion_rate': result[1]}
+        return None
+
+    def update_prospect_response(self, phone_number, sentiment, message_summary=None):
+        """
+        Log une réponse de prospect
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute("""
+                UPDATE prospects 
+                SET last_response_at = ?,
+                    response_sentiment = ?,
+                    notes = CASE 
+                        WHEN notes IS NULL THEN ?
+                        ELSE notes || '\n' || ?
+                    END,
+                    last_updated = ?
+                WHERE phone_number = ?
+            """, (
+                datetime.now().isoformat(),
+                sentiment,
+                f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Réponse {sentiment}: {message_summary or 'N/A'}",
+                f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Réponse {sentiment}: {message_summary or 'N/A'}",
+                datetime.now().isoformat(),
+                phone_number
+            ))
+            
+            cursor.execute(
+                "SELECT method_used FROM prospects WHERE phone_number = ?",
+                (phone_number,)
+            )
+            result = cursor.fetchone()
+            
+            if result and result[0]:
+                cursor.execute("""
+                    UPDATE method_stats 
+                    SET responded = responded + 1,
+                        conversion_rate = (interested * 1.0 / total_sent)
+                    WHERE method_name = ?
+                """, (result[0],))
+            
+            conn.commit()
+            print(f"✅ Réponse loggée: {phone_number} - {sentiment}")
+            
+        except Exception as e:
+            print(f"❌ Erreur log réponse: {e}")
+            self.log_error(
+                'update_prospect_response',
+                str(e),
+                f"phone: {phone_number}, sentiment: {sentiment}"
+            )
+        
+        finally:
+            conn.close()
+
+
 if __name__ == "__main__":
-    # Test
     db = DatabaseManager()
     stats = db.get_stats()
     print(f"\n📊 Stats de la base:")
