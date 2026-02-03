@@ -16,6 +16,23 @@ import sqlite3
 CREDENTIALS_PATH = Path.home() / ".openclaw/credentials/airtable.json"
 DB_PATH = Path.home() / ".openclaw/workspace/prospecting.db"
 
+# Mapping des statuts DB locale → Airtable (simplifié)
+STATUS_MAPPING = {
+    'new': 'new',
+    'to_contact': 'to_contact',
+    'contacted': 'contacted',
+    'interested': 'interested',
+    'responded_positive': 'contacted',
+    'responded_neutral': 'contacted',
+    'responded_negative': 'rejected',
+    'no_response': 'contacted',
+    'not_interested': 'rejected',
+    'transferred_sandra': 'client',
+    'closed_won': 'client',
+    'closed_lost': 'rejected',
+    'qualified': 'interested'
+}
+
 class BidirectionalSync:
     def __init__(self):
         self.db_path = DB_PATH
@@ -40,6 +57,10 @@ class BidirectionalSync:
                 print(f"✅ Connecté à Airtable")
             else:
                 print(f"❌ Credentials Airtable invalides")
+    
+    def _map_status_to_airtable(self, local_status):
+        """Convertit un status DB locale vers Airtable"""
+        return STATUS_MAPPING.get(local_status, 'new')
     
     def log(self, message):
         """Log avec timestamp"""
@@ -72,15 +93,9 @@ class BidirectionalSync:
                     prospects_map[phone] = {
                         'record_id': record['id'],
                         'name': fields.get('Name'),
-                        'business_name': fields.get('Business Name', fields.get('Name')),
                         'city': fields.get('City'),
-                        'country': fields.get('Country'),
-                        'type': fields.get('Type', 'hotel').lower(),
                         'status': fields.get('Status', 'new').lower(),
-                        'address': fields.get('Address'),
-                        'notes': fields.get('Notes'),
-                        'contacted_at': fields.get('Contacted At'),
-                        'last_response_at': fields.get('Last Response At')
+                        'created_at': fields.get('Created At')
                     }
             
             self.log(f"✅ {len(prospects_map)} prospects récupérés d'Airtable")
@@ -167,24 +182,17 @@ class BidirectionalSync:
                     
                     cursor.execute("""
                         INSERT INTO prospects (
-                            phone_number, name, business_name, city, country,
-                            type, status, address, notes, contacted_at,
-                            last_response_at, source, created_at, last_updated
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            phone_number, name, business_name, city, 
+                            status, source, created_at, last_updated
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         phone,
                         at_data['name'],
-                        at_data['business_name'],
-                        at_data['city'],
-                        at_data['country'],
-                        at_data['type'],
+                        at_data['name'],  # business_name = name si pas de distinction
+                        at_data.get('city'),
                         at_data['status'],
-                        at_data['address'],
-                        at_data['notes'],
-                        at_data['contacted_at'],
-                        at_data['last_response_at'],
                         'airtable',
-                        datetime.now().isoformat(),
+                        at_data.get('created_at') or datetime.now().isoformat(),
                         datetime.now().isoformat()
                     ))
                     added += 1
@@ -246,44 +254,31 @@ class BidirectionalSync:
                     # NOUVEAU prospect à ajouter sur Airtable
                     self.log(f"  ➕ Nouveau: {local_data['name']} ({phone})")
                     
-                    # Créer le record Airtable
+                    # Mapper le status vers Airtable
+                    airtable_status = self._map_status_to_airtable(local_data['status'])
+                    
+                    # Créer le record Airtable (SEULEMENT les champs qui existent)
                     self.table.create({
                         'Phone': phone,
                         'Name': local_data['name'],
-                        'Business Name': local_data['business_name'],
-                        'City': local_data['city'],
-                        'Country': local_data['country'],
-                        'Type': local_data['type'].capitalize(),
-                        'Status': local_data['status'],
-                        'Address': local_data['address'] or '',
-                        'Notes': local_data['notes'] or '',
-                        'Contacted At': local_data['contacted_at'],
-                        'Last Response At': local_data['last_response_at'],
-                        'Method Used': local_data['method_used'] or '',
-                        'Response Sentiment': local_data['response_sentiment'] or '',
-                        'Rating': local_data['rating'],
-                        'Review Count': local_data['review_count'],
-                        'Google Maps URL': local_data['google_maps_url'] or ''
+                        'City': local_data.get('city') or '',
+                        'Status': airtable_status
                     })
                     added += 1
                 
                 else:
                     # Prospect EXISTE - La DB locale a priorité sur le status (Anna travaille dessus)
                     local_status = local_data['status']
+                    airtable_status_mapped = self._map_status_to_airtable(local_status)
                     at_status = airtable_prospects[phone]['status']
                     record_id = airtable_prospects[phone]['record_id']
                     
-                    if local_status != at_status:
-                        self.log(f"  🔄 Update status: {local_data['name']} ({at_status} → {local_status})")
+                    if airtable_status_mapped != at_status:
+                        self.log(f"  🔄 Update status: {local_data['name']} ({at_status} → {airtable_status_mapped})")
                         
-                        # Mettre à jour Airtable avec les infos de la DB locale
+                        # Mettre à jour Airtable avec le status mappé
                         self.table.update(record_id, {
-                            'Status': local_status,
-                            'Contacted At': local_data['contacted_at'],
-                            'Last Response At': local_data['last_response_at'],
-                            'Method Used': local_data['method_used'] or '',
-                            'Response Sentiment': local_data['response_sentiment'] or '',
-                            'Notes': local_data['notes'] or ''
+                            'Status': airtable_status_mapped
                         })
                         updated += 1
             
