@@ -8,6 +8,13 @@ credentials/
 openclaw.json
 update-check.json
 
+# Neuraweb Sensitive Files
+openclaw.json*
+*.bak
+*.bak.*
+*.backup.*
+.env
+
 # === DATABASES ===
 *.db
 *.db-journal
