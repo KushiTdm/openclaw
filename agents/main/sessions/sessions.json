@@ -1,6 +1,6 @@
 {
   "agent:main:main": {
-    "updatedAt": 1770176238195,
+    "updatedAt": 1770305499902,
     "deliveryContext": {
       "channel": "whatsapp",
       "to": "+51935507781",
@@ -18,57 +18,25 @@
       "to": "+51935507781",
       "accountId": "default"
     },
-    "sessionId": "cfdc48c6-3f94-449e-952f-1b4b1e4cf24e",
+    "sessionId": "105acf09-7820-4a8d-977f-a5e6e48b3e0e",
     "systemSent": true,
     "abortedLastRun": false,
     "chatType": "direct",
-    "sessionFile": "/home/ubuntu/.openclaw/agents/main/sessions/cfdc48c6-3f94-449e-952f-1b4b1e4cf24e.jsonl",
+    "sessionFile": "/home/ubuntu/.openclaw/agents/main/sessions/105acf09-7820-4a8d-977f-a5e6e48b3e0e.jsonl",
     "skillsSnapshot": {
-      "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>bluebubbles</name>\n    <description>Build or update the BlueBubbles external channel plugin for OpenClaw (extension package, REST send/probe, webhook inbound).</description>\n    <location>/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/bluebubbles/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>skill-creator</name>\n    <description>Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.</description>\n    <location>/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/skill-creator/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>tmux</name>\n    <description>Remote-control tmux sessions for interactive CLIs by sending keystrokes and scraping pane output.</description>\n    <location>/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/tmux/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>weather</name>\n    <description>Get current weather and forecasts (no API key required).</description>\n    <location>/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/weather/SKILL.md</location>\n  </skill>\n</available_skills>",
+      "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\nWhen a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n<available_skills>\n  <skill>\n    <name>nano-banana-pro</name>\n    <description>Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).</description>\n    <location>/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md</location>\n  </skill>\n</available_skills>",
       "skills": [
         {
-          "name": "bluebubbles"
-        },
-        {
-          "name": "skill-creator"
-        },
-        {
-          "name": "tmux"
-        },
-        {
-          "name": "weather"
+          "name": "nano-banana-pro",
+          "primaryEnv": "GEMINI_API_KEY"
         }
       ],
       "resolvedSkills": [
         {
-          "name": "bluebubbles",
-          "description": "Build or update the BlueBubbles external channel plugin for OpenClaw (extension package, REST send/probe, webhook inbound).",
-          "filePath": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/bluebubbles/SKILL.md",
-          "baseDir": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/bluebubbles",
-          "source": "openclaw-bundled",
-          "disableModelInvocation": false
-        },
-        {
-          "name": "skill-creator",
-          "description": "Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.",
-          "filePath": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/skill-creator/SKILL.md",
-          "baseDir": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/skill-creator",
-          "source": "openclaw-bundled",
-          "disableModelInvocation": false
-        },
-        {
-          "name": "tmux",
-          "description": "Remote-control tmux sessions for interactive CLIs by sending keystrokes and scraping pane output.",
-          "filePath": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/tmux/SKILL.md",
-          "baseDir": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/tmux",
-          "source": "openclaw-bundled",
-          "disableModelInvocation": false
-        },
-        {
-          "name": "weather",
-          "description": "Get current weather and forecasts (no API key required).",
-          "filePath": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/weather/SKILL.md",
-          "baseDir": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/weather",
+          "name": "nano-banana-pro",
+          "description": "Generate or edit images via Gemini 3 Pro Image (Nano Banana Pro).",
+          "filePath": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/nano-banana-pro/SKILL.md",
+          "baseDir": "/home/ubuntu/.npm-global/lib/node_modules/openclaw/skills/nano-banana-pro",
           "source": "openclaw-bundled",
           "disableModelInvocation": false
         }
@@ -78,16 +46,16 @@
     "authProfileOverride": "google:default",
     "authProfileOverrideSource": "auto",
     "authProfileOverrideCompactionCount": 0,
-    "inputTokens": 56454,
-    "outputTokens": 101,
-    "totalTokens": 56454,
+    "inputTokens": 17808,
+    "outputTokens": 29,
+    "totalTokens": 17808,
     "modelProvider": "google",
     "model": "gemini-2.0-flash",
     "contextTokens": 1048576,
     "systemPromptReport": {
       "source": "run",
-      "generatedAt": 1770176214162,
-      "sessionId": "cfdc48c6-3f94-449e-952f-1b4b1e4cf24e",
+      "generatedAt": 1770305491222,
+      "sessionId": "105acf09-7820-4a8d-977f-a5e6e48b3e0e",
       "sessionKey": "agent:main:main",
       "provider": "google",
       "model": "gemini-2.0-flash",
@@ -98,9 +66,9 @@
         "sandboxed": false
       },
       "systemPrompt": {
-        "chars": 35943,
-        "projectContextChars": 26148,
-        "nonProjectContextChars": 9795
+        "chars": 36907,
+        "projectContextChars": 27975,
+        "nonProjectContextChars": 8932
       },
       "injectedWorkspaceFiles": [
         {
@@ -115,8 +83,8 @@
           "name": "SOUL.md",
           "path": "/home/ubuntu/.openclaw/workspace/SOUL.md",
           "missing": false,
-          "rawChars": 8997,
-          "injectedChars": 8997,
+          "rawChars": 10824,
+          "injectedChars": 10824,
           "truncated": false
         },
         {
@@ -161,23 +129,11 @@
         }
       ],
       "skills": {
-        "promptChars": 1488,
+        "promptChars": 625,
         "entries": [
           {
-            "name": "bluebubbles",
-            "blockChars": 306
-          },
-          {
-            "name": "skill-creator",
-            "blockChars": 307
-          },
-          {
-            "name": "tmux",
-            "blockChars": 266
-          },
-          {
-            "name": "weather",
-            "blockChars": 231
+            "name": "nano-banana-pro",
+            "blockChars": 256
           }
         ]
       },
