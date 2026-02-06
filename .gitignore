@@ -3,22 +3,37 @@ credentials/
 *.key
 *.pem
 .env
+.env.*
+
+# === AUTH & IDENTITY ===
+# Clés d'authentification des agents
+agents/*/agent/auth-profiles.json
+auth-profiles.json
+
+# Device identity et tokens
+identity/
+device-auth.json
+device.json
 
 # === CONFIG SENSIBLE ===
 openclaw.json
+openclaw.json.*
 update-check.json
-
-# Neuraweb Sensitive Files
-openclaw.json*
 *.bak
 *.bak.*
 *.backup.*
-.env
 
 # === DATABASES ===
 *.db
 *.db-journal
 *.sqlite*
+prospecting.db
+
+# === SESSIONS & TRANSCRIPTS ===
+# Contiennent conversations et potentiellement données sensibles
+agents/*/sessions/
+sessions/
+*.jsonl
 
 # === LOGS & MEMORY ===
 logs/
@@ -29,20 +44,38 @@ canvas/
 cron/
 devices/
 
+# === COOKIES & BROWSER DATA ===
+# Pour Puppeteer/Twitter
+.cookies.json
+*.cookies
+user-data-dir/
+
 # === PYTHON ===
 __pycache__/
 *.pyc
 venv/
 .venv/
+*.egg-info/
 
 # === NODE ===
 node_modules/
+package-lock.json
+yarn.lock
 
 # === SYSTÈME ===
 .DS_Store
 *.swp
 *~
+.Trash-*/
 
 # === BACKUPS ===
 *.backup
 *.bak
+
+# === SCRIPTS DE TEST (peuvent contenir clés) ===
+test_credentials.py
+debug_*.py
+
+# === OUTPUT FILES (peuvent contenir données clients) ===
+# Garder le répertoire mais ignorer son contenu si sensible
+# workspace/prospecting_*.md si contient infos prospects
