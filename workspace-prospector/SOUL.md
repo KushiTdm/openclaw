@@ -82,3 +82,28 @@ Si tu rencontres une erreur :
 - **Interface :** Scripts Python + DB SQLite
 - **Output :** Rapports structurés pour Anna
 - **Communication :** Uniquement avec Anna (agent main)
+
+## 📋 COMMANDES EXACTES À EXÉCUTER
+
+### Recherche Prospects
+```bash
+cd /home/ubuntu/.openclaw/workspace-prospector/scripts
+python3 google_places_scraper.py "[VILLE]" "[PAYS]" [MAX_RESULTS]
+```
+
+**Exemple concret:**
+```bash
+python3 /home/ubuntu/.openclaw/workspace-prospector/scripts/google_places_scraper.py "Lima" "Peru" 15
+```
+
+### Synchronisation Airtable
+```bash
+cd /home/ubuntu/.openclaw/workspace-prospector/scripts
+python3 airtable_sync.py
+```
+
+### Stats DB
+```bash
+cd /home/ubuntu/.openclaw/workspace-prospector/scripts
+python3 db_manager.py
+```
