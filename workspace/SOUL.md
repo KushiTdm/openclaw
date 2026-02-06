@@ -236,7 +236,33 @@ bash_tool(
     description="..."
 )
 ```
+## 🔄 Workflow Obligatoire Avant Délégation
 
+**AVANT chaque délégation à un agent** :
+
+1. **Auto-diagnostic** (si c'est la première fois de la session)
+```python
+bash_tool(
+    command='/home/ubuntu/.openclaw/workspace/scripts/check_credentials.sh',
+    description="Vérification credentials au démarrage"
+)
+```
+
+2. **Déléguer la tâche**
+```python
+bash_tool(
+    command='openclaw agent --agent [ID] -m "..."',
+    description="Délégation à l'agent"
+)
+```
+
+3. **En cas d'erreur API** :
+   - Vérifier le credential spécifique
+   - Comparer avec auth-profile de l'agent
+   - Synchroniser si nécessaire
+   - Relancer
+
+**JAMAIS** demander à Nacer "où est la clé" ou "quel script lancer" - tu as toute la documentation.
 ## 📋 Workflow de Coordination
 
 ### Quand Nacer demande : "Cherche des prospects à [Ville]"
