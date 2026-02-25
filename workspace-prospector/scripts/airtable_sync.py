@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Airtable Sync - Anna Prospection v2.0
-Synchronisation BI-DIRECTIONNELLE avec Airtable
-- Évite les doublons (vérification par phone_number)
-- Sync status dans les 2 sens
-- Ajoute nouveaux prospects des 2 côtés
+Airtable Sync v3 - Synchronisation bidirectionnelle
+Nouveautés:
+- Champ "Site web" synchronisé
+- Champ "has_website" pris en compte
+- Support transferts Sandra/Nacer
 """
 
 from pyairtable import Api
@@ -16,7 +16,6 @@ import sqlite3
 CREDENTIALS_PATH = Path.home() / ".openclaw/credentials/airtable.json"
 DB_PATH = Path.home() / ".openclaw/workspace/prospecting.db"
 
-# Mapping des statuts DB locale → Airtable (simplifié)
 STATUS_MAPPING = {
     'new': 'new',
     'to_contact': 'to_contact',
@@ -28,6 +27,7 @@ STATUS_MAPPING = {
     'no_response': 'contacted',
     'not_interested': 'rejected',
     'transferred_sandra': 'client',
+    'transferred_nacer': 'interested',
     'closed_won': 'client',
     'closed_lost': 'rejected',
     'qualified': 'interested'
@@ -39,300 +39,195 @@ class BidirectionalSync:
         self.api = None
         self.table = None
         self._load_credentials()
-    
+
     def _load_credentials(self):
-        """Charge les credentials Airtable"""
         if not CREDENTIALS_PATH.exists():
             print(f"❌ Credentials Airtable non trouvés: {CREDENTIALS_PATH}")
             return
-        
         with open(CREDENTIALS_PATH, 'r') as f:
             creds = json.load(f)
             api_key = creds.get('api_key')
             base_id = creds.get('base_id')
-            
             if api_key and base_id:
                 self.api = Api(api_key)
                 self.table = self.api.table(base_id, 'Prospects')
                 print(f"✅ Connecté à Airtable")
             else:
                 print(f"❌ Credentials Airtable invalides")
-    
-    def _map_status_to_airtable(self, local_status):
-        """Convertit un status DB locale vers Airtable"""
+
+    def _map_status(self, local_status):
         return STATUS_MAPPING.get(local_status, 'new')
-    
+
     def log(self, message):
-        """Log avec timestamp"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] {message}")
-    
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+
     def get_airtable_prospects(self):
-        """
-        Récupère TOUS les prospects d'Airtable
-        Returns: dict {phone_number: record_data}
-        """
         if not self.table:
-            self.log("❌ Pas de connexion Airtable")
             return {}
-        
         self.log("📥 Récupération prospects Airtable...")
-        
         try:
             records = self.table.all()
-            
             prospects_map = {}
             for record in records:
                 fields = record['fields']
-                phone = fields.get('Phone')
-                
+                phone = fields.get('Phone', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
                 if phone:
-                    # Normaliser le numéro (supprimer espaces, tirets)
-                    phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
-                    
                     prospects_map[phone] = {
                         'record_id': record['id'],
                         'name': fields.get('Name'),
                         'city': fields.get('City'),
                         'status': fields.get('Status', 'new').lower(),
+                        'website': fields.get('Site web', ''),
                         'created_at': fields.get('Created At')
                     }
-            
-            self.log(f"✅ {len(prospects_map)} prospects récupérés d'Airtable")
+            self.log(f"✅ {len(prospects_map)} prospects Airtable")
             return prospects_map
-            
         except Exception as e:
-            self.log(f"❌ Erreur récupération Airtable: {e}")
+            self.log(f"❌ Erreur Airtable: {e}")
             return {}
-    
+
     def get_local_prospects(self):
-        """
-        Récupère TOUS les prospects de la DB locale
-        Returns: dict {phone_number: record_data}
-        """
         self.log("📥 Récupération prospects DB locale...")
-        
         try:
             conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row  # Permet d'accéder aux colonnes par nom
+            conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
             cursor.execute("""
-                SELECT 
-                    phone_number, name, business_name, city, country,
-                    type, status, address, notes, contacted_at,
-                    last_response_at, method_used, response_sentiment,
-                    rating, review_count, google_maps_url
+                SELECT phone_number, name, business_name, city, country,
+                       type, status, address, notes, contacted_at,
+                       last_response_at, method_used, response_sentiment,
+                       rating, review_count, google_maps_url, website, has_website
                 FROM prospects
             """)
-            
             rows = cursor.fetchall()
             conn.close()
-            
             prospects_map = {}
             for row in rows:
-                phone = row['phone_number']
-                # Normaliser
-                phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
-                
-                prospects_map[phone] = {
-                    'name': row['name'],
-                    'business_name': row['business_name'],
-                    'city': row['city'],
-                    'country': row['country'],
-                    'type': row['type'],
-                    'status': row['status'],
-                    'address': row['address'],
-                    'notes': row['notes'],
-                    'contacted_at': row['contacted_at'],
-                    'last_response_at': row['last_response_at'],
-                    'method_used': row['method_used'],
-                    'response_sentiment': row['response_sentiment'],
-                    'rating': row['rating'],
-                    'review_count': row['review_count'],
-                    'google_maps_url': row['google_maps_url']
-                }
-            
-            self.log(f"✅ {len(prospects_map)} prospects récupérés DB locale")
+                phone = row['phone_number'].replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+                prospects_map[phone] = dict(row)
+            self.log(f"✅ {len(prospects_map)} prospects DB locale")
             return prospects_map
-            
         except Exception as e:
-            self.log(f"❌ Erreur récupération DB locale: {e}")
+            self.log(f"❌ Erreur DB locale: {e}")
             return {}
-    
-    def sync_airtable_to_local(self, airtable_prospects, local_prospects):
-        """
-        Sync Airtable → DB Locale
-        - Ajoute nouveaux prospects
-        - Met à jour status si changé
-        """
-        self.log("\n🔄 SYNC: Airtable → DB Locale")
-        
+
+    def sync_local_to_airtable(self, local_prospects, airtable_prospects):
+        if not self.table:
+            return 0, 0
+        self.log("\n🔄 SYNC: DB Locale → Airtable")
         added = 0
         updated = 0
-        
+
+        for phone, local_data in local_prospects.items():
+            try:
+                airtable_status = self._map_status(local_data['status'])
+                website = local_data.get('website') or ''
+
+                if phone not in airtable_prospects:
+                    self.log(f"  ➕ Nouveau: {local_data['name']} ({phone})")
+                    fields = {
+                        'Phone': phone,
+                        'Name': local_data['name'] or '',
+                        'City': local_data.get('city') or '',
+                        'Status': airtable_status,
+                    }
+                    if website:
+                        fields['Site web'] = website
+                    self.table.create(fields)
+                    added += 1
+                else:
+                    record_id = airtable_prospects[phone]['record_id']
+                    at_status = airtable_prospects[phone]['status']
+                    at_website = airtable_prospects[phone].get('website', '')
+                    updates = {}
+
+                    if airtable_status != at_status:
+                        self.log(f"  🔄 Status: {local_data['name']} ({at_status} → {airtable_status})")
+                        updates['Status'] = airtable_status
+
+                    if website and website != at_website:
+                        updates['Site web'] = website
+
+                    if updates:
+                        self.table.update(record_id, updates)
+                        updated += 1
+
+            except Exception as e:
+                self.log(f"  ❌ Erreur sync {phone}: {e}")
+
+        self.log(f"✅ Ajoutés: {added} | Mis à jour: {updated}")
+        return added, updated
+
+    def sync_airtable_to_local(self, airtable_prospects, local_prospects):
+        self.log("\n🔄 SYNC: Airtable → DB Locale")
+        added = 0
+        updated = 0
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         for phone, at_data in airtable_prospects.items():
             try:
                 if phone not in local_prospects:
-                    # NOUVEAU prospect à ajouter
-                    self.log(f"  ➕ Nouveau: {at_data['name']} ({phone})")
-                    
+                    self.log(f"  ➕ Nouveau depuis Airtable: {at_data['name']} ({phone})")
                     cursor.execute("""
                         INSERT INTO prospects (
-                            phone_number, name, business_name, city, 
-                            status, source, created_at, last_updated
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            phone_number, name, business_name, city,
+                            status, website, has_website, source, created_at, last_updated
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
-                        phone,
-                        at_data['name'],
-                        at_data['name'],  # business_name = name si pas de distinction
-                        at_data.get('city'),
-                        at_data['status'],
+                        phone, at_data['name'], at_data['name'],
+                        at_data.get('city'), at_data['status'],
+                        at_data.get('website', ''),
+                        bool(at_data.get('website', '')),
                         'airtable',
                         at_data.get('created_at') or datetime.now().isoformat(),
                         datetime.now().isoformat()
                     ))
                     added += 1
-                
                 else:
-                    # Prospect EXISTE - Vérifier si status a changé
                     local_status = local_prospects[phone]['status']
                     at_status = at_data['status']
-                    
                     if local_status != at_status:
-                        # Airtable est la source de vérité si modifié manuellement
-                        self.log(f"  🔄 Update status: {at_data['name']} ({local_status} → {at_status})")
-                        
-                        cursor.execute("""
-                            UPDATE prospects 
-                            SET status = ?, 
-                                notes = CASE 
-                                    WHEN notes IS NULL THEN ?
-                                    ELSE notes || '\n' || ?
-                                END,
-                                last_updated = ?
-                            WHERE phone_number = ?
-                        """, (
-                            at_status,
-                            f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Status sync depuis Airtable: {at_status}",
-                            f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Status sync depuis Airtable: {at_status}",
-                            datetime.now().isoformat(),
-                            phone
-                        ))
+                        self.log(f"  🔄 Status Airtable→Local: {at_data['name']} ({local_status} → {at_status})")
+                        cursor.execute(
+                            "UPDATE prospects SET status=?, last_updated=? WHERE phone_number=?",
+                            (at_status, datetime.now().isoformat(), phone)
+                        )
                         updated += 1
-            
+
             except Exception as e:
                 self.log(f"  ❌ Erreur sync {phone}: {e}")
-        
+
         conn.commit()
         conn.close()
-        
         self.log(f"✅ Ajoutés: {added} | Mis à jour: {updated}")
         return added, updated
-    
-    def sync_local_to_airtable(self, local_prospects, airtable_prospects):
-        """
-        Sync DB Locale → Airtable
-        - Ajoute nouveaux prospects
-        - Met à jour status si changé (priorité à la DB locale car Anna travaille dessus)
-        """
-        if not self.table:
-            self.log("❌ Pas de connexion Airtable")
-            return 0, 0
-        
-        self.log("\n🔄 SYNC: DB Locale → Airtable")
-        
-        added = 0
-        updated = 0
-        
-        for phone, local_data in local_prospects.items():
-            try:
-                if phone not in airtable_prospects:
-                    # NOUVEAU prospect à ajouter sur Airtable
-                    self.log(f"  ➕ Nouveau: {local_data['name']} ({phone})")
-                    
-                    # Mapper le status vers Airtable
-                    airtable_status = self._map_status_to_airtable(local_data['status'])
-                    
-                    # Créer le record Airtable (SEULEMENT les champs qui existent)
-                    self.table.create({
-                        'Phone': phone,
-                        'Name': local_data['name'],
-                        'City': local_data.get('city') or '',
-                        'Status': airtable_status
-                    })
-                    added += 1
-                
-                else:
-                    # Prospect EXISTE - La DB locale a priorité sur le status (Anna travaille dessus)
-                    local_status = local_data['status']
-                    airtable_status_mapped = self._map_status_to_airtable(local_status)
-                    at_status = airtable_prospects[phone]['status']
-                    record_id = airtable_prospects[phone]['record_id']
-                    
-                    if airtable_status_mapped != at_status:
-                        self.log(f"  🔄 Update status: {local_data['name']} ({at_status} → {airtable_status_mapped})")
-                        
-                        # Mettre à jour Airtable avec le status mappé
-                        self.table.update(record_id, {
-                            'Status': airtable_status_mapped
-                        })
-                        updated += 1
-            
-            except Exception as e:
-                self.log(f"  ❌ Erreur sync {phone}: {e}")
-        
-        self.log(f"✅ Ajoutés: {added} | Mis à jour: {updated}")
-        return added, updated
-    
+
     def run_full_sync(self):
-        """
-        Exécute la synchronisation complète bidirectionnelle
-        """
-        self.log("="*70)
+        self.log("=" * 70)
         self.log("🔄 SYNCHRONISATION BIDIRECTIONNELLE AIRTABLE ↔ DB LOCALE")
-        self.log("="*70)
-        
+        self.log("=" * 70)
+
         if not self.table:
             self.log("❌ Impossible de synchroniser sans connexion Airtable")
             return
-        
-        # 1. Récupérer les données des 2 côtés
+
         airtable_prospects = self.get_airtable_prospects()
         local_prospects = self.get_local_prospects()
-        
-        # 2. Sync Airtable → Local (nouveaux prospects + updates status)
-        at_to_local_added, at_to_local_updated = self.sync_airtable_to_local(
-            airtable_prospects, 
-            local_prospects
-        )
-        
-        # 3. Sync Local → Airtable (nouveaux prospects + updates status)
-        # IMPORTANT: On recharge local_prospects pour avoir les ajouts du step 2
+
+        at_added, at_updated = self.sync_airtable_to_local(airtable_prospects, local_prospects)
         local_prospects = self.get_local_prospects()
-        local_to_at_added, local_to_at_updated = self.sync_local_to_airtable(
-            local_prospects,
-            airtable_prospects
-        )
-        
-        # 4. Résumé
-        self.log("\n" + "="*70)
-        self.log("📊 RÉSUMÉ SYNCHRONISATION")
-        self.log("="*70)
-        self.log(f"Airtable → DB Locale:")
-        self.log(f"  ➕ Ajoutés: {at_to_local_added}")
-        self.log(f"  🔄 Mis à jour: {at_to_local_updated}")
-        self.log(f"\nDB Locale → Airtable:")
-        self.log(f"  ➕ Ajoutés: {local_to_at_added}")
-        self.log(f"  🔄 Mis à jour: {local_to_at_updated}")
-        self.log("="*70)
-        
+        l_added, l_updated = self.sync_local_to_airtable(local_prospects, airtable_prospects)
+
+        self.log("\n" + "=" * 70)
+        self.log("📊 RÉSUMÉ")
+        self.log(f"  Airtable→Local: +{at_added} ajoutés, {at_updated} mis à jour")
+        self.log(f"  Local→Airtable: +{l_added} ajoutés, {l_updated} mis à jour")
+        self.log("=" * 70)
+
         return {
-            'airtable_to_local': {'added': at_to_local_added, 'updated': at_to_local_updated},
-            'local_to_airtable': {'added': local_to_at_added, 'updated': local_to_at_updated}
+            'airtable_to_local': {'added': at_added, 'updated': at_updated},
+            'local_to_airtable': {'added': l_added, 'updated': l_updated}
         }
 
 
