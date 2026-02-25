@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Database Manager - Anna Prospection
-Gestion de la base de données SQLite pour prospects
+Database Manager v3 - Anna Prospection
+Nouveautés: has_website, website, transferred_to, stats améliorées
 """
 
 import sqlite3
@@ -15,56 +15,46 @@ class DatabaseManager:
     def __init__(self):
         self.db_path = DB_PATH
         self._ensure_db_exists()
-    
+
     def _ensure_db_exists(self):
-        """Crée la DB si elle n'existe pas"""
         if not self.db_path.exists():
-            print(f"⚠️  Base de données non trouvée. Initialisation...")
-            init_script = Path.home() / ".openclaw/workspace/scripts/init_db.sql"
+            print(f"⚠️  DB non trouvée. Initialisation...")
+            init_script = Path.home() / ".openclaw/workspace-prospector/scripts/init_db.sql"
+            if not init_script.exists():
+                init_script = Path.home() / ".openclaw/workspace/scripts/init_db.sql"
             if init_script.exists():
                 with open(init_script, 'r') as f:
                     sql = f.read()
                 conn = sqlite3.connect(self.db_path)
                 conn.executescript(sql)
                 conn.close()
-                print(f"✅ Base de données créée: {self.db_path}")
+                print(f"✅ DB créée: {self.db_path}")
             else:
                 print(f"❌ Script init_db.sql non trouvé!")
-    
+
     def check_duplicate(self, phone_number):
-        """
-        Vérifie si un numéro existe déjà en base
-        
-        Returns:
-            bool: True si doublon, False sinon
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
         cursor.execute("SELECT COUNT(*) FROM prospects WHERE phone_number = ?", (phone_number,))
         count = cursor.fetchone()[0]
-        
         conn.close()
         return count > 0
-    
+
     def insert_prospect(self, prospect_data):
-        """
-        Insère un nouveau prospect (avec vérification doublon)
-        """
         if self.check_duplicate(prospect_data['phone_number']):
             print(f"⚠️  Doublon: {prospect_data['phone_number']} ({prospect_data.get('name')})")
             return False
-        
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
         try:
+            website = prospect_data.get('website', '') or ''
+            has_website = bool(website) or prospect_data.get('has_website', False)
             cursor.execute("""
                 INSERT INTO prospects (
                     phone_number, name, business_name, city, country,
                     type, source, google_maps_url, address, rating,
-                    review_count, status, created_at, last_updated
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    review_count, website, has_website, status, created_at, last_updated
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 prospect_data['phone_number'],
                 prospect_data.get('name'),
@@ -77,242 +67,139 @@ class DatabaseManager:
                 prospect_data.get('address'),
                 prospect_data.get('rating'),
                 prospect_data.get('review_count'),
+                website,
+                has_website,
                 'new',
                 datetime.now().isoformat(),
                 datetime.now().isoformat()
             ))
-            
             conn.commit()
-            print(f"✅ Prospect ajouté: {prospect_data.get('name')} ({prospect_data['phone_number']})")
+            website_tag = "🌐" if has_website else "📵"
+            print(f"✅ {website_tag} Prospect ajouté: {prospect_data.get('name')} ({prospect_data['phone_number']})")
             return True
-            
         except Exception as e:
             print(f"❌ Erreur insertion: {e}")
             self.log_error('insert_prospect', str(e), json.dumps(prospect_data))
             return False
-        
         finally:
             conn.close()
-    
-    def update_status(self, phone_number, new_status, notes=None):
-        """
-        Met à jour le statut d'un prospect
-        """
+
+    def update_status(self, phone_number, new_status, notes=None, method_used=None):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
         try:
+            now = datetime.now().isoformat()
             if new_status == 'contacted':
                 cursor.execute("""
-                    UPDATE prospects 
-                    SET status = ?, contacted_at = ?, last_updated = ?, notes = ?
-                    WHERE phone_number = ?
-                """, (new_status, datetime.now().isoformat(), datetime.now().isoformat(), notes, phone_number))
+                    UPDATE prospects
+                    SET status=?, contacted_at=?, last_updated=?, notes=?
+                    """ + (", method_used=?" if method_used else "") + """
+                    WHERE phone_number=?
+                """, ([new_status, now, now, notes] + ([method_used] if method_used else []) + [phone_number]))
+            elif new_status in ('transferred_sandra', 'transferred_nacer'):
+                transferred_to = 'sandra' if new_status == 'transferred_sandra' else 'nacer'
+                cursor.execute("""
+                    UPDATE prospects
+                    SET status=?, transferred_at=?, transferred_to=?, last_updated=?, notes=?
+                    WHERE phone_number=?
+                """, (new_status, now, transferred_to, now, notes, phone_number))
             else:
                 cursor.execute("""
-                    UPDATE prospects 
-                    SET status = ?, last_updated = ?, notes = ?
-                    WHERE phone_number = ?
-                """, (new_status, datetime.now().isoformat(), notes, phone_number))
-            
+                    UPDATE prospects
+                    SET status=?, last_updated=?, notes=?
+                    WHERE phone_number=?
+                """, (new_status, now, notes, phone_number))
             conn.commit()
-            print(f"✅ Status mis à jour: {phone_number} → {new_status}")
-            
+            print(f"✅ Status: {phone_number} → {new_status}")
         except Exception as e:
             print(f"❌ Erreur update: {e}")
             self.log_error('update_status', str(e), f"phone: {phone_number}, status: {new_status}")
-        
         finally:
             conn.close()
-    
+
     def get_prospects_to_contact(self, limit=10):
-        """
-        Récupère les prospects avec status='to_contact'
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
         cursor.execute("""
-            SELECT phone_number, name, city, business_name, country
-            FROM prospects 
+            SELECT phone_number, name, city, business_name, country, has_website, website
+            FROM prospects
             WHERE status = 'to_contact'
             ORDER BY created_at ASC
             LIMIT ?
         """, (limit,))
-        
         results = cursor.fetchall()
         conn.close()
-        
         return results
-    
+
     def get_stats(self, date=None):
-        """
-        Récupère les stats pour une date donnée (ou aujourd'hui)
-        """
         if not date:
             date = datetime.now().strftime('%Y-%m-%d')
-        
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
         cursor.execute("SELECT status, COUNT(*) FROM prospects GROUP BY status")
         status_counts = dict(cursor.fetchall())
-        
-        cursor.execute("""
-            SELECT COUNT(*) FROM prospects 
-            WHERE DATE(created_at) = ?
-        """, (date,))
+
+        cursor.execute("SELECT COUNT(*) FROM prospects WHERE has_website=1")
+        with_website = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM prospects WHERE has_website=0 OR has_website IS NULL")
+        without_website = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM prospects WHERE DATE(created_at)=?", (date,))
         today_created = cursor.fetchone()[0]
-        
-        cursor.execute("""
-            SELECT COUNT(*) FROM prospects 
-            WHERE DATE(contacted_at) = ?
-        """, (date,))
+
+        cursor.execute("SELECT COUNT(*) FROM prospects WHERE DATE(contacted_at)=?", (date,))
         today_contacted = cursor.fetchone()[0]
-        
+
+        cursor.execute("SELECT COUNT(*) FROM prospects WHERE DATE(transferred_at)=? AND transferred_to='sandra'", (date,))
+        today_transferred_sandra = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM prospects WHERE DATE(transferred_at)=? AND transferred_to='nacer'", (date,))
+        today_transferred_nacer = cursor.fetchone()[0]
+
         conn.close()
-        
+        total = sum(status_counts.values())
+
         return {
             'date': date,
+            'total': total,
+            'with_website': with_website,
+            'without_website': without_website,
             'status_counts': status_counts,
             'today_created': today_created,
             'today_contacted': today_contacted,
-            'total': sum(status_counts.values())
+            'today_transferred_sandra': today_transferred_sandra,
+            'today_transferred_nacer': today_transferred_nacer
         }
-    
+
     def log_error(self, error_type, error_message, context):
-        """Log une erreur dans la table errors_log"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO errors_log (error_type, error_message, context)
-            VALUES (?, ?, ?)
-        """, (error_type, error_message, context))
-        
+        cursor.execute(
+            "INSERT INTO errors_log (error_type, error_message, context) VALUES (?, ?, ?)",
+            (error_type, error_message, context)
+        )
         conn.commit()
         conn.close()
 
-    # ============================
-    # NOUVELLES MÉTHODES AJOUTÉES
-    # ============================
-
-    def update_method_stats(self, method_name, action):
-        """
-        Met à jour les stats d'une méthode
-        """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        try:
-            if action == 'sent':
-                cursor.execute("""
-                    UPDATE method_stats 
-                    SET total_sent = total_sent + 1,
-                        last_updated = ?
-                    WHERE method_name = ?
-                """, (datetime.now().isoformat(), method_name))
-            
-            elif action == 'responded':
-                cursor.execute("""
-                    UPDATE method_stats 
-                    SET responded = responded + 1,
-                        conversion_rate = (responded * 1.0 / total_sent),
-                        last_updated = ?
-                    WHERE method_name = ?
-                """, (datetime.now().isoformat(), method_name))
-            
-            elif action == 'interested':
-                cursor.execute("""
-                    UPDATE method_stats 
-                    SET interested = interested + 1,
-                        conversion_rate = (interested * 1.0 / total_sent),
-                        last_updated = ?
-                    WHERE method_name = ?
-                """, (datetime.now().isoformat(), method_name))
-            
-            conn.commit()
-            print(f"✅ Stats méthode {method_name} mises à jour: {action}")
-            
-        except Exception as e:
-            print(f"❌ Erreur update stats: {e}")
-            self.log_error('update_method_stats', str(e), f"method: {method_name}, action: {action}")
-        
-        finally:
-            conn.close()
-
-    def get_best_method(self):
-        """Retourne la méthode avec le meilleur taux de conversion"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT method_name, conversion_rate 
-            FROM method_stats 
-            WHERE total_sent > 0
-            ORDER BY conversion_rate DESC 
-            LIMIT 1
-        """)
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if result:
-            return {'method': result[0], 'conversion_rate': result[1]}
-        return None
-
     def update_prospect_response(self, phone_number, sentiment, message_summary=None):
-        """
-        Log une réponse de prospect
-        """
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
         try:
+            now = datetime.now().isoformat()
+            note = f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Réponse {sentiment}: {message_summary or 'N/A'}"
             cursor.execute("""
-                UPDATE prospects 
-                SET last_response_at = ?,
-                    response_sentiment = ?,
-                    notes = CASE 
-                        WHEN notes IS NULL THEN ?
-                        ELSE notes || '\n' || ?
-                    END,
-                    last_updated = ?
-                WHERE phone_number = ?
-            """, (
-                datetime.now().isoformat(),
-                sentiment,
-                f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Réponse {sentiment}: {message_summary or 'N/A'}",
-                f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Réponse {sentiment}: {message_summary or 'N/A'}",
-                datetime.now().isoformat(),
-                phone_number
-            ))
-            
-            cursor.execute(
-                "SELECT method_used FROM prospects WHERE phone_number = ?",
-                (phone_number,)
-            )
-            result = cursor.fetchone()
-            
-            if result and result[0]:
-                cursor.execute("""
-                    UPDATE method_stats 
-                    SET responded = responded + 1,
-                        conversion_rate = (interested * 1.0 / total_sent)
-                    WHERE method_name = ?
-                """, (result[0],))
-            
+                UPDATE prospects
+                SET last_response_at=?, response_sentiment=?,
+                    notes=CASE WHEN notes IS NULL THEN ? ELSE notes || '\n' || ? END,
+                    last_updated=?
+                WHERE phone_number=?
+            """, (now, sentiment, note, note, now, phone_number))
             conn.commit()
             print(f"✅ Réponse loggée: {phone_number} - {sentiment}")
-            
         except Exception as e:
             print(f"❌ Erreur log réponse: {e}")
-            self.log_error(
-                'update_prospect_response',
-                str(e),
-                f"phone: {phone_number}, sentiment: {sentiment}"
-            )
-        
         finally:
             conn.close()
 
@@ -320,8 +207,12 @@ class DatabaseManager:
 if __name__ == "__main__":
     db = DatabaseManager()
     stats = db.get_stats()
-    print(f"\n📊 Stats de la base:")
+    print(f"\n📊 Stats DB — {stats['date']}")
     print(f"   Total prospects: {stats['total']}")
+    print(f"   🌐 Avec site web: {stats['with_website']}")
+    print(f"   📵 Sans site web: {stats['without_website']}")
     print(f"   Par statut: {stats['status_counts']}")
     print(f"   Créés aujourd'hui: {stats['today_created']}")
     print(f"   Contactés aujourd'hui: {stats['today_contacted']}")
+    print(f"   Transférés Sandra: {stats['today_transferred_sandra']}")
+    print(f"   Transférés Nacer: {stats['today_transferred_nacer']}")
