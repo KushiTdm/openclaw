@@ -1,236 +1,204 @@
 #!/usr/bin/env python3
 """
-Airtable Sync v3 - Synchronisation bidirectionnelle
-Nouveautés:
-- Champ "Site web" synchronisé
-- Champ "has_website" pris en compte
-- Support transferts Sandra/Nacer
+Airtable Sync — Anna / NeuraWeb
+Gère la mise à jour des statuts prospects dans Airtable.
+
+Usage:
+  python3 airtable_sync.py --list-to-contact
+  python3 airtable_sync.py --list-all
+  python3 airtable_sync.py --update-status "+57300..." "interested" "Notes ici"
+  python3 airtable_sync.py --stats
+  python3 airtable_sync.py --check-duplicate "+57300..."
 """
 
-from pyairtable import Api
 import json
-from pathlib import Path
+import sys
 from datetime import datetime
-import sqlite3
+from pathlib import Path
 
-CREDENTIALS_PATH = Path.home() / ".openclaw/credentials/airtable.json"
-DB_PATH = Path.home() / ".openclaw/workspace/prospecting.db"
+AIRTABLE_CREDENTIALS = Path.home() / ".openclaw/credentials/airtable.json"
 
-STATUS_MAPPING = {
-    'new': 'new',
-    'to_contact': 'to_contact',
-    'contacted': 'contacted',
-    'interested': 'interested',
-    'responded_positive': 'contacted',
-    'responded_neutral': 'contacted',
-    'responded_negative': 'rejected',
-    'no_response': 'contacted',
-    'not_interested': 'rejected',
-    'transferred_sandra': 'client',
-    'transferred_nacer': 'interested',
-    'closed_won': 'client',
-    'closed_lost': 'rejected',
-    'qualified': 'interested'
-}
+VALID_STATUSES = ["to_contact", "contacted", "no_response", "interested", "refused", "client"]
 
-class BidirectionalSync:
-    def __init__(self):
-        self.db_path = DB_PATH
-        self.api = None
-        self.table = None
-        self._load_credentials()
 
-    def _load_credentials(self):
-        if not CREDENTIALS_PATH.exists():
-            print(f"❌ Credentials Airtable non trouvés: {CREDENTIALS_PATH}")
-            return
-        with open(CREDENTIALS_PATH, 'r') as f:
-            creds = json.load(f)
-            api_key = creds.get('api_key')
-            base_id = creds.get('base_id')
-            if api_key and base_id:
-                self.api = Api(api_key)
-                self.table = self.api.table(base_id, 'Prospects')
-                print(f"✅ Connecté à Airtable")
-            else:
-                print(f"❌ Credentials Airtable invalides")
+def load_table():
+    if not AIRTABLE_CREDENTIALS.exists():
+        print("❌ Credentials Airtable non trouvés:", AIRTABLE_CREDENTIALS)
+        return None
+    with open(AIRTABLE_CREDENTIALS) as f:
+        creds = json.load(f)
+    try:
+        from pyairtable import Api
+        api = Api(creds["api_key"])
+        table = api.table(creds["base_id"], "Prospects")
+        print("✅ Connecté à Airtable")
+        return table
+    except Exception as e:
+        print(f"❌ Erreur connexion: {e}")
+        return None
 
-    def _map_status(self, local_status):
-        return STATUS_MAPPING.get(local_status, 'new')
 
-    def log(self, message):
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+def list_to_contact(table, city=None):
+    """Liste les prospects à contacter."""
+    formula = "Status = 'to_contact'"
+    if city:
+        formula = f"AND(Status = 'to_contact', City = '{city}')"
+    try:
+        records = table.all(formula=formula)
+        print(f"\n📋 Prospects à contacter{' à ' + city if city else ''}: {len(records)}\n")
+        for r in records:
+            f = r["fields"]
+            print(f"  📱 {f.get('Name', '?')} | {f.get('Phone', '?')} | {f.get('City', '?')} | {f.get('Type', '?')}")
+        return records
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        return []
 
-    def get_airtable_prospects(self):
-        if not self.table:
-            return {}
-        self.log("📥 Récupération prospects Airtable...")
-        try:
-            records = self.table.all()
-            prospects_map = {}
-            for record in records:
-                fields = record['fields']
-                phone = fields.get('Phone', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
-                if phone:
-                    prospects_map[phone] = {
-                        'record_id': record['id'],
-                        'name': fields.get('Name'),
-                        'city': fields.get('City'),
-                        'status': fields.get('Status', 'new').lower(),
-                        'website': fields.get('Site web', ''),
-                        'created_at': fields.get('Created At')
-                    }
-            self.log(f"✅ {len(prospects_map)} prospects Airtable")
-            return prospects_map
-        except Exception as e:
-            self.log(f"❌ Erreur Airtable: {e}")
-            return {}
 
-    def get_local_prospects(self):
-        self.log("📥 Récupération prospects DB locale...")
-        try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT phone_number, name, business_name, city, country,
-                       type, status, address, notes, contacted_at,
-                       last_response_at, method_used, response_sentiment,
-                       rating, review_count, google_maps_url, website, has_website
-                FROM prospects
-            """)
-            rows = cursor.fetchall()
-            conn.close()
-            prospects_map = {}
-            for row in rows:
-                phone = row['phone_number'].replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
-                prospects_map[phone] = dict(row)
-            self.log(f"✅ {len(prospects_map)} prospects DB locale")
-            return prospects_map
-        except Exception as e:
-            self.log(f"❌ Erreur DB locale: {e}")
-            return {}
+def list_all(table):
+    """Affiche les stats par statut."""
+    try:
+        records = table.all()
+        by_status = {}
+        for r in records:
+            status = r["fields"].get("Status", "unknown")
+            by_status[status] = by_status.get(status, 0) + 1
 
-    def sync_local_to_airtable(self, local_prospects, airtable_prospects):
-        if not self.table:
-            return 0, 0
-        self.log("\n🔄 SYNC: DB Locale → Airtable")
-        added = 0
-        updated = 0
+        print(f"\n📊 Total prospects: {len(records)}")
+        for status, count in sorted(by_status.items()):
+            print(f"   {status}: {count}")
+        return records
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        return []
 
-        for phone, local_data in local_prospects.items():
-            try:
-                airtable_status = self._map_status(local_data['status'])
-                website = local_data.get('website') or ''
 
-                if phone not in airtable_prospects:
-                    self.log(f"  ➕ Nouveau: {local_data['name']} ({phone})")
-                    fields = {
-                        'Phone': phone,
-                        'Name': local_data['name'] or '',
-                        'City': local_data.get('city') or '',
-                        'Status': airtable_status,
-                    }
-                    if website:
-                        fields['Site web'] = website
-                    self.table.create(fields)
-                    added += 1
-                else:
-                    record_id = airtable_prospects[phone]['record_id']
-                    at_status = airtable_prospects[phone]['status']
-                    at_website = airtable_prospects[phone].get('website', '')
-                    updates = {}
+def update_status(table, phone, new_status, notes=None):
+    """Met à jour le statut d'un prospect par son numéro de téléphone."""
+    if new_status not in VALID_STATUSES:
+        print(f"❌ Statut invalide: {new_status}")
+        print(f"   Valides: {', '.join(VALID_STATUSES)}")
+        return False
 
-                    if airtable_status != at_status:
-                        self.log(f"  🔄 Status: {local_data['name']} ({at_status} → {airtable_status})")
-                        updates['Status'] = airtable_status
+    phone_clean = phone.replace(" ", "")
+    try:
+        records = table.all(formula=f"Phone = '{phone_clean}'")
+        if not records:
+            print(f"❌ Prospect non trouvé: {phone_clean}")
+            return False
 
-                    if website and website != at_website:
-                        updates['Site web'] = website
+        record_id = records[0]["id"]
+        fields = {"Status": new_status, "last_updated": datetime.now().isoformat()}
 
-                    if updates:
-                        self.table.update(record_id, updates)
-                        updated += 1
+        if new_status == "contacted" and not records[0]["fields"].get("contacted_at"):
+            fields["contacted_at"] = datetime.now().isoformat()
 
-            except Exception as e:
-                self.log(f"  ❌ Erreur sync {phone}: {e}")
+        if notes:
+            existing_notes = records[0]["fields"].get("Notes", "")
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            new_note = f"[{timestamp}] {notes}"
+            fields["Notes"] = f"{existing_notes}\n{new_note}".strip() if existing_notes else new_note
 
-        self.log(f"✅ Ajoutés: {added} | Mis à jour: {updated}")
-        return added, updated
+        table.update(record_id, fields)
+        print(f"✅ Mis à jour: {records[0]['fields'].get('Name', phone_clean)} → {new_status}")
+        return True
 
-    def sync_airtable_to_local(self, airtable_prospects, local_prospects):
-        self.log("\n🔄 SYNC: Airtable → DB Locale")
-        added = 0
-        updated = 0
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+    except Exception as e:
+        print(f"❌ Erreur mise à jour: {e}")
+        return False
 
-        for phone, at_data in airtable_prospects.items():
-            try:
-                if phone not in local_prospects:
-                    self.log(f"  ➕ Nouveau depuis Airtable: {at_data['name']} ({phone})")
-                    cursor.execute("""
-                        INSERT INTO prospects (
-                            phone_number, name, business_name, city,
-                            status, website, has_website, source, created_at, last_updated
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        phone, at_data['name'], at_data['name'],
-                        at_data.get('city'), at_data['status'],
-                        at_data.get('website', ''),
-                        bool(at_data.get('website', '')),
-                        'airtable',
-                        at_data.get('created_at') or datetime.now().isoformat(),
-                        datetime.now().isoformat()
-                    ))
-                    added += 1
-                else:
-                    local_status = local_prospects[phone]['status']
-                    at_status = at_data['status']
-                    if local_status != at_status:
-                        self.log(f"  🔄 Status Airtable→Local: {at_data['name']} ({local_status} → {at_status})")
-                        cursor.execute(
-                            "UPDATE prospects SET status=?, last_updated=? WHERE phone_number=?",
-                            (at_status, datetime.now().isoformat(), phone)
-                        )
-                        updated += 1
 
-            except Exception as e:
-                self.log(f"  ❌ Erreur sync {phone}: {e}")
+def check_duplicate(table, phone):
+    """Vérifie si un numéro est déjà dans Airtable."""
+    phone_clean = phone.replace(" ", "")
+    try:
+        records = table.all(formula=f"Phone = '{phone_clean}'")
+        if records:
+            r = records[0]["fields"]
+            print(f"⚠️ DOUBLON: {r.get('Name', '?')} ({phone_clean}) — Status: {r.get('Status', '?')}")
+            return True
+        else:
+            print(f"✅ Pas de doublon pour {phone_clean}")
+            return False
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        return False
 
-        conn.commit()
-        conn.close()
-        self.log(f"✅ Ajoutés: {added} | Mis à jour: {updated}")
-        return added, updated
 
-    def run_full_sync(self):
-        self.log("=" * 70)
-        self.log("🔄 SYNCHRONISATION BIDIRECTIONNELLE AIRTABLE ↔ DB LOCALE")
-        self.log("=" * 70)
+def get_stats(table):
+    """Retourne les stats complètes."""
+    try:
+        records = table.all()
+        today = datetime.now().strftime("%Y-%m-%d")
+        by_status = {}
+        by_city = {}
+        contacted_today = 0
 
-        if not self.table:
-            self.log("❌ Impossible de synchroniser sans connexion Airtable")
-            return
+        for r in records:
+            f = r["fields"]
+            status = f.get("Status", "unknown")
+            city = f.get("City", "unknown")
+            contacted_at = f.get("contacted_at", "")
 
-        airtable_prospects = self.get_airtable_prospects()
-        local_prospects = self.get_local_prospects()
+            by_status[status] = by_status.get(status, 0) + 1
+            by_city[city] = by_city.get(city, 0) + 1
 
-        at_added, at_updated = self.sync_airtable_to_local(airtable_prospects, local_prospects)
-        local_prospects = self.get_local_prospects()
-        l_added, l_updated = self.sync_local_to_airtable(local_prospects, airtable_prospects)
+            if contacted_at and contacted_at.startswith(today):
+                contacted_today += 1
 
-        self.log("\n" + "=" * 70)
-        self.log("📊 RÉSUMÉ")
-        self.log(f"  Airtable→Local: +{at_added} ajoutés, {at_updated} mis à jour")
-        self.log(f"  Local→Airtable: +{l_added} ajoutés, {l_updated} mis à jour")
-        self.log("=" * 70)
+        print(f"\n{'='*50}")
+        print(f"📊 STATS AIRTABLE — {today}")
+        print(f"{'='*50}")
+        print(f"Total: {len(records)}")
+        print(f"Contactés aujourd'hui: {contacted_today}")
+        print(f"\nPar statut:")
+        for s, c in sorted(by_status.items()):
+            print(f"  {s}: {c}")
+        print(f"\nPar ville (top 5):")
+        for city, count in sorted(by_city.items(), key=lambda x: -x[1])[:5]:
+            print(f"  {city}: {count}")
+        print(f"{'='*50}\n")
 
-        return {
-            'airtable_to_local': {'added': at_added, 'updated': at_updated},
-            'local_to_airtable': {'added': l_added, 'updated': l_updated}
-        }
+    except Exception as e:
+        print(f"❌ Erreur stats: {e}")
 
 
 if __name__ == "__main__":
-    sync = BidirectionalSync()
-    sync.run_full_sync()
+    table = load_table()
+    if not table:
+        sys.exit(1)
+
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(0)
+
+    cmd = sys.argv[1]
+
+    if cmd == "--list-to-contact":
+        city = sys.argv[2] if len(sys.argv) >= 3 else None
+        list_to_contact(table, city)
+
+    elif cmd == "--list-all":
+        list_all(table)
+
+    elif cmd == "--update-status":
+        if len(sys.argv) < 4:
+            print("Usage: --update-status <phone> <status> [notes]")
+            sys.exit(1)
+        phone = sys.argv[2]
+        status = sys.argv[3]
+        notes = sys.argv[4] if len(sys.argv) >= 5 else None
+        update_status(table, phone, status, notes)
+
+    elif cmd == "--check-duplicate":
+        if len(sys.argv) < 3:
+            print("Usage: --check-duplicate <phone>")
+            sys.exit(1)
+        check_duplicate(table, sys.argv[2])
+
+    elif cmd == "--stats":
+        get_stats(table)
+
+    else:
+        print(f"❌ Commande inconnue: {cmd}")
+        print(__doc__)

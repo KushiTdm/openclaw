@@ -46,3 +46,27 @@ node_modules/
 # === BACKUPS ===
 *.backup
 *.bak
+
+# === CREDENTIALS — JAMAIS COMMITTER ===
+credentials/
+*.key
+*.pem
+.env
+auth-profiles.json
+
+# === CONFIG SENSIBLE ===
+openclaw.json
+
+# === LOGS & MEMORY (optionnel — peut committer MEMORY.md mais pas les logs quotidiens) ===
+memory/*.md
+
+# === CACHE ===
+__pycache__/
+*.pyc
+*.db
+*.sqlite
+
+# === SYSTÈME ===
+.DS_Store
+*.swp
+*~
