@@ -88,10 +88,7 @@ def update_status(table, phone, new_status, notes=None):
             return False
 
         record_id = records[0]["id"]
-        fields = {"Status": new_status, "last_updated": datetime.now().isoformat()}
-
-        if new_status == "contacted" and not records[0]["fields"].get("contacted_at"):
-            fields["contacted_at"] = datetime.now().isoformat()
+        fields = {"Status": new_status}
 
         if notes:
             existing_notes = records[0]["fields"].get("Notes", "")

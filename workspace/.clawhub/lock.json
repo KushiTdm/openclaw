@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "skills": {
+    "elevenlabs-voices": {
+      "version": "2.1.6",
+      "installedAt": 1774983286693
+    }
+  }
+}

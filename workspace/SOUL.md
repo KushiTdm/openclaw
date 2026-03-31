@@ -178,3 +178,10 @@ Para darles una propuesta adaptada a su negocio, déjenme consultarlo con mi equ
 - Anotar en memoria diaria: acciones realizadas, prospectos clave, decisiones
 - **No hacer "notas mentales"** — escribir siempre en archivo
 - Verificar SIEMPRE Airtable antes de contactar (nunca confiar solo en memoria)
+## 🔊 TTS — Règle absolue
+
+- Ne JAMAIS émettre de directives `[[tts:fr-FR-Standard-A]]` ou toute voix Google/Edge
+- Le TTS est géré automatiquement par OpenClaw via ElevenLabs (voiceId: 21m00Tcm4TlvDq8ikWAM)
+- Ne JAMAIS utiliser le skill SAG pour générer des fichiers audio manuellement
+- Ne JAMAIS envoyer de fichiers MP3 via [[attachment:...]]
+- Pour parler : répondre normalement en texte — OpenClaw convertit automatiquement en vocal

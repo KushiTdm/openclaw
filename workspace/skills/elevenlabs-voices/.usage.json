@@ -1,0 +1,37 @@
+{
+  "total_characters": 1240,
+  "total_requests": 6,
+  "sessions": [
+    {
+      "timestamp": "2026-03-31T18:55:03.378147",
+      "characters": 179,
+      "voice": "rachel"
+    },
+    {
+      "timestamp": "2026-03-31T19:00:18.312406",
+      "characters": 201,
+      "voice": "rachel"
+    },
+    {
+      "timestamp": "2026-03-31T19:01:40.162579",
+      "characters": 225,
+      "voice": "rachel"
+    },
+    {
+      "timestamp": "2026-03-31T19:28:51.168646",
+      "characters": 294,
+      "voice": "rachel"
+    },
+    {
+      "timestamp": "2026-03-31T19:47:58.317084",
+      "characters": 124,
+      "voice": "rachel"
+    },
+    {
+      "timestamp": "2026-03-31T22:28:23.933217",
+      "characters": 217,
+      "voice": "rachel"
+    }
+  ],
+  "last_reset": "2026-03-31T18:55:03.378132"
+}
