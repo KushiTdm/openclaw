@@ -5,5 +5,29 @@
     "token": "VDKDy3tZIEBlB18bwwoZRUcpjKVBxHmo"
   },
   "defaults": {},
-  "agents": {}
+  "agents": {
+    "main": {
+      "allowlist": [
+        {
+          "id": "b4efb7a8-1b19-4ecd-9305-d69bd8799599",
+          "pattern": "/usr/bin/ls",
+          "lastUsedAt": 1775004073274
+        },
+        {
+          "id": "65c2a8fb-e69e-47f9-b39d-e3cdb5a9f592",
+          "pattern": "/usr/bin/curl",
+          "lastUsedAt": 1775005349863,
+          "lastUsedCommand": "curl -s -X POST \"https://api.elevenlabs.io/v1/text-to-speech/HRcW1ZTfZR9qe0zq5rIu\" -H \"xi-api-key: sk_29b1ff7811dc14a169e28d7c2c7c3f53a47ba154602cd581\" -H \"Content-Type: application/json\" -d \"{\\\"text\\\":\\\"C'est noté Nacer. Je reviens à une vitesse normale pour que ce soit plus clair et plus naturel. Est-ce que ce débit te convient mieux ?\\\",\\\"model_id\\\":\\\"eleven_multilingual_v2\\\",\\\"voice_settings\\\":{\\\"stability\\\":0.5,\\\"similarity_boost\\\":0.75}}\" -o /tmp/feedback_normal.mp3 && ffmpeg -y -i /tmp/feedback_normal.mp3 -c:a libopus -b:a 64k -ar 48000 -ac 1 -application voip /tmp/feedback_normal.ogg && npx openclaw message send --channel whatsapp --target \"+51935507781\" --media \"/tmp/feedback_normal.ogg\"",
+          "lastResolvedPath": "/usr/bin/curl"
+        },
+        {
+          "id": "9b0eaf68-1fb5-49dc-9233-5d748107deb5",
+          "pattern": "/usr/bin/ffmpeg",
+          "lastUsedAt": 1775005349863,
+          "lastUsedCommand": "curl -s -X POST \"https://api.elevenlabs.io/v1/text-to-speech/HRcW1ZTfZR9qe0zq5rIu\" -H \"xi-api-key: sk_29b1ff7811dc14a169e28d7c2c7c3f53a47ba154602cd581\" -H \"Content-Type: application/json\" -d \"{\\\"text\\\":\\\"C'est noté Nacer. Je reviens à une vitesse normale pour que ce soit plus clair et plus naturel. Est-ce que ce débit te convient mieux ?\\\",\\\"model_id\\\":\\\"eleven_multilingual_v2\\\",\\\"voice_settings\\\":{\\\"stability\\\":0.5,\\\"similarity_boost\\\":0.75}}\" -o /tmp/feedback_normal.mp3 && ffmpeg -y -i /tmp/feedback_normal.mp3 -c:a libopus -b:a 64k -ar 48000 -ac 1 -application voip /tmp/feedback_normal.ogg && npx openclaw message send --channel whatsapp --target \"+51935507781\" --media \"/tmp/feedback_normal.ogg\"",
+          "lastResolvedPath": "/usr/bin/curl"
+        }
+      ]
+    }
+  }
 }
