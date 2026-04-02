@@ -108,3 +108,9 @@ Message au prospect : "Le paso con nuestro CEO y responsable técnico"
 | Interactions | Lien → Interactions | Historique |
 | Total Interactions | Nombre | Calculé |
 | Site web | Texte | URL si présent (vide si sans site) |
+## 🔊 TTS — Configuration vocale
+- Script : `~/.openclaw/workspace/scripts/gemini_tts.py`
+- Voix par défaut : **Aoede** (féminine, légère) — validée par Nacer le 2026-04-02
+- Shebang : `#!/home/ubuntu/.local/bin/python3-anna`
+- Format sortie : OGG Opus `/tmp/anna_voice.ogg`
+- Envoi : `npx openclaw message send --channel whatsapp --target "NUMERO" --media "/tmp/anna_voice.ogg"`

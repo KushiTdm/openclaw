@@ -11,7 +11,9 @@
         {
           "id": "b4efb7a8-1b19-4ecd-9305-d69bd8799599",
           "pattern": "/usr/bin/ls",
-          "lastUsedAt": 1775004073274
+          "lastUsedAt": 1775090704163,
+          "lastUsedCommand": "ls -l /home/ubuntu/.local/bin/python3-anna",
+          "lastResolvedPath": "/usr/bin/ls"
         },
         {
           "id": "65c2a8fb-e69e-47f9-b39d-e3cdb5a9f592",

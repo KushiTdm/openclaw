@@ -3,6 +3,7 @@ credentials/
 *.key
 *.pem
 .env
+*.jsonl
 
 # === CONFIG SENSIBLE ===
 openclaw.json
@@ -70,3 +71,9 @@ __pycache__/
 .DS_Store
 *.swp
 *~
+identity/
+agents/main/sessions/
+delivery-queue/
+identity/
+subagents/runs.json
+*.jsonl

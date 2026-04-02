@@ -38,7 +38,7 @@ NO_REPLY
 
 | Voix | Style | Recommandé pour |
 |------|-------|-----------------|
-| Zephyr | Chaleureuse | ✅ Anna par défaut |
+| Aoede | Légère | ✅ Anna par défaut |
 | Aoede | Légère | Espagnol décontracté |
 | Leda | Jeune | Prospectos jeunes |
 | Achird | Amicale | Conversations casual |

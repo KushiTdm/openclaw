@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/ubuntu/.local/bin/python3-anna
 """
 Gemini TTS — Remplacement ElevenLabs pour Anna / NeuraWeb
 Génère un fichier WAV depuis Gemini 2.5 Flash TTS, puis le convertit en OGG Opus pour WhatsApp.
